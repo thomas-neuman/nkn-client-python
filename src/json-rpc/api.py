@@ -1,4 +1,4 @@
-import requests
+from nkn_client.jsonrpc.rpc import call_rpc
 
 class NknJsonRpcApi(object):
   """
