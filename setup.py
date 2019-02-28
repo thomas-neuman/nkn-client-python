@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup
 
 setup(
 		name='NKN Client for Python',
@@ -18,5 +18,9 @@ setup(
     },
     install_requires=[
       'requests'
+    ],
+    test_suite='test',
+    tests_require=[
+      'responses'
     ],
 )
