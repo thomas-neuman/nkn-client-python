@@ -2,7 +2,7 @@ import functools
 import responses
 import unittest
 
-from api import NknJsonRpcApi
+from nkn_client.jsonrpc.api import NknJsonRpcApi
 
 class TestNknJsonRpcApi(unittest.TestCase):
   def setUp(self):
