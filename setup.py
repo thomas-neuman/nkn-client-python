@@ -16,4 +16,7 @@ setup(
       'nkn_client': 'src',
       'nkn_client.jsonrpc': 'src/json-rpc',
     },
+    install_requires=[
+      'requests'
+    ],
 )
