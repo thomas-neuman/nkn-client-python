@@ -16,7 +16,8 @@ setup(
       'nkn_client': 'src',
     },
     install_requires=[
-      'requests'
+      'requests',
+      'websockets'
     ],
     test_suite='test',
     tests_require=[
