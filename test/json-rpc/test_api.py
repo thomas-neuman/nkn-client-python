@@ -1,23 +1,24 @@
 import functools
+import json
 import responses
 import unittest
 
-from nkn_client.jsonrpc.api import NknJsonRpcApi
+import nkn_client.jsonrpc.api
+
 
 class TestNknJsonRpcApi(unittest.TestCase):
   def setUp(self):
     self._host = "hostname"
-    self._api = NknJsonRpcApi(self._host)
+    self._api = nkn_client.jsonrpc.api.NknJsonRpcApi(self._host)
 
-  def _with_rpc_response(self, method, expected_json, expected_status):
-    with responses.RequestsMock() as resp:
-      resp.add(
-          responses.POST,
-          "http://%s/" % (self._host),
-          json=expected_json,
-          status=expected_status
-      )
-      return method()
+  @responses.activate
+  def _with_rpc_response(self, method, resp_cb):
+    responses.add_callback(
+        responses.POST,
+        "http://%s/" % (self._host),
+        callback=resp_cb
+    )
+    return method()
 
   def _with_success_response(self, method, expected_result):
     expected_json = {
@@ -27,7 +28,15 @@ class TestNknJsonRpcApi(unittest.TestCase):
     }
     expected_status = 200
 
-    return self._with_rpc_response(method, expected_json, expected_status)
+    def resp_callback(request):
+      req_body = json.loads(request.body)
+      resp_body = expected_json.copy()
+      resp_body.update({"id": req_body["id"]})
+
+      return (expected_status, {}, json.dumps(resp_body))
+
+    return self._with_rpc_response(method, resp_callback)
+
 
   def test_get_latest_block_height_succeeds(self):
     method = self._api.get_latest_block_height

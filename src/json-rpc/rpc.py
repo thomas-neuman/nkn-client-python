@@ -3,7 +3,7 @@ import uuid
 
 def _generate_id():
   # Returns a randomly generated ID.
-  return uuid.uuid4()
+  return str(uuid.uuid4())
 
 def call_rpc(url, method, params=None, req_id=None):
   """

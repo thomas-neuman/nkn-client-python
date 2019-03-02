@@ -1,3 +1,5 @@
+import json
+
 from nkn_client.jsonrpc.rpc import call_rpc
 
 class NknJsonRpcApi(object):
@@ -9,25 +11,34 @@ class NknJsonRpcApi(object):
     hostname (str) : The hostname on which the API is served.
   """
   def __init__(self, hostname):
-    self._host = hostname
+    self._url = "http://%s/" % hostname
+
+  def _call_rpc(self, *args, **kwargs):
+    result = call_rpc(self._url, *args, **kwargs)
+
+    if "error" in result:
+      raise RuntimeError(
+          "JSON-RPC server reported error!\n%s" % (json.dumps(error))
+      )
+    return result["result"]
 
   def get_latest_block_height(self):
     """
     Returns the height of the latest block in the chain.
     """
-    pass
+    return self._call_rpc("getlatestblockheight")
 
   def get_latest_block_hash(self):
     """
     Returns the hash of the latest block in the chain.
     """
-    pass
+    return self._call_rpc("getlatestblockhash")
 
   def get_block_count(self):
     """
     Return the number of blocks in the chain.
     """
-    pass
+    return self._call_rpc("getblockcount")
 
   def get_block(self, height=None, hash=None):
     """
@@ -42,7 +53,20 @@ class NknJsonRpcApi(object):
       ValueError    : If neither height nor hash are provided as parameters, or
                       if both height and hash are provided.
     """
-    pass
+    if (height is None) and (hash is None):
+      raise ValueError("Must supply one of 'height' or 'hash' parameters!")
+    if (height is not None) and (hash is not None):
+      raise ValueError(
+          "Cannot supply both of 'height' and 'hash' parameters at once!"
+      )
+
+    params = {}
+    if height is not None:
+      params["height"] = height
+    if hash is not None:
+      params["hash"] = hash
+
+    return self._call_rpc("getblock", params=params)
 
   def get_block_transactions_by_height(self, height):
     """
@@ -56,19 +80,19 @@ class NknJsonRpcApi(object):
                       transactions hashes as strings, or None if no such block
                       exists.
     """
-    pass
+    return self._call_rpc("getblocktxsbyheight", params={"height": height})
 
   def get_connection_count(self):
     """
     Returns the number of connections to this node.
     """
-    pass
+    return self._call_rpc("getconnectioncount")
 
   def get_raw_mempool(self):
     """
     Returns the list of transactions in the transaction mempool.
     """
-    pass
+    return self._call_rpc("getrawmempool")
 
   def get_transaction(self, hash):
     """
@@ -80,7 +104,7 @@ class NknJsonRpcApi(object):
       dict        : Contents of the transaction, or None if no such transaction
                     exists.
     """
-    pass
+    return self._call_rpc("gettransaction", params={"hash": hash})
 
   def get_websocket_address(self, client_addr):
     """
@@ -94,28 +118,28 @@ class NknJsonRpcApi(object):
       str               : Hostname and port of the Websocket server, to be
                           concatenated with 'ws://' or 'wss://' to connect.
     """
-    pass
+    return self._call_rpc("getwsaddr", params={"address": client_addr})
 
   def get_version(self):
     """
     Returns the version of the server.
     """
-    pass
+    return self._call_rpc("getversion")
 
   def get_neighbor(self):
     """
     Returns all neighbor nodes of this server.
     """
-    pass
+    return self._call_rpc("getneighbor")
 
   def get_node_state(self):
     """
     Returns the status information of this server.
     """
-    pass
+    return self._call_rpc("getnodestate")
 
   def get_chord_ring_info(self):
     """
     Returns the chord information of this server.
     """
-    pass
+    return self._call_rpc("getchordringinfo")
