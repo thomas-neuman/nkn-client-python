@@ -10,7 +10,8 @@ setup(
 		url='https://github.com/thomas-neuman/nkn-client-python/',
     packages=[
       'nkn_client',
-      'nkn_client.jsonrpc'
+      'nkn_client.jsonrpc',
+      'nkn_client.websocket'
     ],
 		package_dir={
       'nkn_client': 'src',
@@ -21,6 +22,7 @@ setup(
     ],
     test_suite='test',
     tests_require=[
+      'asynctest',
       'responses'
     ],
 )
