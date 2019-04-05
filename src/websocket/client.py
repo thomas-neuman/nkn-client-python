@@ -3,9 +3,6 @@ import threading
 import websockets
 
 
-def run_to_completion(task):
-  asyncio.get_running_loop().run_to_completion(task)
-
 class WebsocketClientException(Exception):
   pass
 
@@ -69,7 +66,7 @@ class WebsocketClient(object):
       self._running = False
 
       if self._ws is not None:
-        run_to_completion(self._ws.close())
+        asyncio.run(self._ws.close())
         self._ws = None
 
   async def _handle_send(self):
@@ -91,7 +88,7 @@ class WebsocketClient(object):
     with self._lk:
       if not self._running:
         raise WebsocketClientException("Client is not connected!")
-    run_to_completion(self._outbox.put(msg))
+    asyncio.run(self._outbox.put(msg))
 
   async def _handle_recv(self):
     msg = await self._ws.recv()
