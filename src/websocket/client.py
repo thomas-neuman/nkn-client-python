@@ -34,9 +34,6 @@ class WebsocketClient(object):
     # For outgoing messages. Set up with a Queue when the main loop begins.
     self._outbox = None
 
-  def __del__(self):
-    self.disconnect()
-
   def connect(self):
     """
     Opens a connection to the WebSocket server, enabling the client to send
@@ -61,6 +58,7 @@ class WebsocketClient(object):
         # Terminate the main loop, if it is running.
         self._running = False
 
+      with self._cv:
         # Close the underlying connection.
         if self._ws is not None:
           await self._ws.close()
@@ -104,15 +102,13 @@ class WebsocketClient(object):
 
   async def _create_connection(self):
     # Modification must occur under the lock.
-    with self._cv:
-      assert self._ws is None
-      self._ws = await websockets.client.connect(self._url)
+    assert self._ws is None
+    self._ws = await websockets.client.connect(self._url)
 
   async def _destroy_connection(self):
     # Modification must occur under the lock.
-    with self._cv:
-      assert self._ws is not None
-      self._ws = None
+    assert self._ws is not None
+    self._ws = None
 
   async def _handle_send(self):
     while True:
@@ -170,7 +166,8 @@ class WebsocketClient(object):
 
     while running:
       # Set up the connection.
-      await self._create_connection()
+      with self._cv:
+        await self._create_connection()
 
       # Handle send/recv events.
       pending = await self._send_recv_until_closed()
@@ -182,7 +179,8 @@ class WebsocketClient(object):
         pass
 
       # Tear down the connection on the client.
-      await self._destroy_connection()
+      with self._cv:
+        await self._destroy_connection()
 
       with self._cv:
         running = self._running

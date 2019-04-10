@@ -39,7 +39,7 @@ class TestWebsocketClient(asynctest.TestCase):
     self.client.recv = lambda msg: msg
 
   def tearDown(self):
-    self.client = None
+    self.client.disconnect()
 
   @patch("websockets.client")
   def test_connect_opens_connection(self, mock_ws):
