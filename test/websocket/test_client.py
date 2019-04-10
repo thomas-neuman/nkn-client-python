@@ -62,7 +62,8 @@ class TestWebsocketClient(asynctest.TestCase):
     mock_ws.connect = CoroutineMock(return_value=MockWebsocketsConnection())
 
     with patch("asyncio.wait", new=CoroutineMock()) as mock_wait:
-      mock_wait.return_value = [ [ "OK" ], [ ] ]      self.client.connect()
+      mock_wait.return_value = [ [ "OK" ], [ ] ]
+      self.client.connect()
 
     self.client.disconnect()
 
