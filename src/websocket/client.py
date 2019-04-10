@@ -31,6 +31,7 @@ class WebsocketClient(object):
 
     # Used to lock construction/destruction of WebSocket connection.
     self._lk = threading.Lock()
+    self._cv = threading.Condition(self._lk)
 
     # The future which loops forever, handling send/recv events.
     self._main_task = None
@@ -49,18 +50,19 @@ class WebsocketClient(object):
     def _start():
       asyncio.run(self._main_loop())
 
-    with self._lk:
-      if self._running:
-        return
-      self._running = True
     threading.Thread(target=_start).start()
+
+    # Wait until the loop has declared itself running before we return.
+    with self._cv:
+      while not self._running:
+        self._cv.wait()
 
   def disconnect(self):
     """
     Closes the connection to the WebSocket server.
     """
     async def func():
-      with self._lk:
+      with self._cv:
         # Terminate the main loop, if it is running.
         self._running = False
 
@@ -82,7 +84,7 @@ class WebsocketClient(object):
     Raises:
       WebsocketClientException  : If the client is not connected.
     """
-    with self._lk:
+    with self._cv:
       if not self._running:
         raise WebsocketClientException("Client is not connected!")
       asyncio.run(self._outbox.put(msg))
@@ -100,22 +102,20 @@ class WebsocketClient(object):
     pass
 
   def _create_send_queue(self):
-    with self._lk:
-      self._outbox = asyncio.Queue()
+    self._outbox = asyncio.Queue()
 
   def _destroy_send_queue(self):
-    with self._lk:
-      self._outbox = None
+    self._outbox = None
 
   async def _create_connection(self):
     # Modification must occur under the lock.
-    with self._lk:
+    with self._cv:
       assert self._ws is None
       self._ws = await websockets.client.connect(self._url)
 
   async def _destroy_connection(self):
     # Modification must occur under the lock.
-    with self._lk:
+    with self._cv:
       assert self._ws is not None
       self._ws = None
 
@@ -161,13 +161,18 @@ class WebsocketClient(object):
     underlying websocket connection based on the current state of the caller's
     intent.
     """
-    # Construct the queue for storing messages to be sent.
-    # This must be done in the same async event loop as it is
-    # used in.
-    self._create_send_queue()
+    with self._cv:
+      # Construct the queue for storing messages to be sent.
+      # This must be done in the same async event loop as it is
+      # used in.
+      self._create_send_queue()
 
-    with self._lk:
-      running = self._running
+      if self._running:
+        return
+      self._running = True
+      self._cv.notify()
+
+    running = True
 
     while running:
       # Set up the connection.
@@ -185,8 +190,9 @@ class WebsocketClient(object):
       # Tear down the connection on the client.
       await self._destroy_connection()
 
-      with self._lk:
+      with self._cv:
         running = self._running
 
-    # Tear down the queue after the loop has terminated.
-    self._destroy_send_queue()
+    with self._cv:
+      # Tear down the queue after the loop has terminated.
+      self._destroy_send_queue()
