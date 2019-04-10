@@ -1,6 +1,6 @@
 import asyncio
 import asynctest
-from asynctest import CoroutineMock, MagicMock, patch
+from asynctest import CoroutineMock, MagicMock, Mock, patch
 import threading
 import websockets
 from websockets.exceptions import ConnectionClosed
@@ -29,8 +29,9 @@ class MockWebsocketsConnection(object):
 
 class MockAsyncioQueue(object):
   def __init__(self):
-    self.put = CoroutineMock()
-    self.get = CoroutineMock()
+    real_queue = asyncio.Queue()
+    self.put = CoroutineMock(wraps=real_queue.put)
+    self.get = real_queue.get
 
 class TestWebsocketClient(asynctest.TestCase):
   def setUp(self):
@@ -62,30 +63,36 @@ class TestWebsocketClient(asynctest.TestCase):
     self.client.connect()
     self.client.disconnect()
 
-  @patch("asyncio.Queue")
+  @patch("asyncio.Queue", return_value=MockAsyncioQueue())
   @patch("websockets.client")
   def test_send_one_succeeds(self, mock_ws, mock_queue):
     mock_ws.connect = CoroutineMock(return_value=MockWebsocketsConnection())
-    mock_queue.return_value = mock_queue_obj = MockAsyncioQueue()
+    mock_put = mock_queue.return_value.put
 
     self.client.connect()
+
     self.client.send("message")
+    mock_put.assert_awaited()
+
     self.client.disconnect()
 
-    mock_queue_obj.put.assert_awaited()
-
-  @patch("asyncio.Queue")
+  @patch("asyncio.Queue", return_value=MockAsyncioQueue())
   @patch("websockets.client")
   def test_send_many_succeeds(self, mock_ws, mock_queue):
     mock_ws.connect = CoroutineMock(return_value=MockWebsocketsConnection())
-    mock_queue.return_value = mock_queue_obj = MockAsyncioQueue()
+    mock_put = mock_queue.return_value.put
 
     self.client.connect()
-    self.client.send("message")
-    self.client.send("next")
-    self.client.disconnect()
 
-    mock_queue_obj.put.assert_awaited()
+    self.client.send("message")
+    mock_put.assert_awaited()
+    mock_put.reset_mock()
+
+    self.client.send("next")
+    mock_put.assert_awaited()
+    mock_put.reset_mock()
+
+    self.client.disconnect()
 
   def test_send_after_disconnect_fails(self):
     self.client.disconnect()
