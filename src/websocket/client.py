@@ -7,9 +7,6 @@ import websockets
 class WebsocketClientException(Exception):
   pass
 
-class WebsocketSessionShutdownException(Exception):
-  pass
-
 
 class WebsocketClient(object):
   """
@@ -32,9 +29,6 @@ class WebsocketClient(object):
     # Used to lock construction/destruction of WebSocket connection.
     self._lk = threading.Lock()
     self._cv = threading.Condition(self._lk)
-
-    # The future which loops forever, handling send/recv events.
-    self._main_task = None
 
     # For outgoing messages. Set up with a Queue when the main loop begins.
     self._outbox = None
