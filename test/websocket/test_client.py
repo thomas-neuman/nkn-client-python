@@ -1,8 +1,7 @@
 import asyncio
 import asynctest
-from asynctest import CoroutineMock, MagicMock, Mock, patch, return_once
+from asynctest import CoroutineMock, MagicMock, Mock, patch
 import threading
-from time import sleep
 import websockets
 from websockets.exceptions import ConnectionClosed
 
@@ -13,49 +12,44 @@ from nkn_client.websocket.client import (
 )
 
 
+class MockWebsocketsConnection(object):
+  def __init__(self):
+    self._running = True
+    self.send = CoroutineMock()
+
+  async def close(self):
+    self._running = False
+
+  async def recv(self):
+    if not self._running:
+      raise ConnectionClosed(1, "str")
+    val = MagicMock()
+    val.result = MagicMock(return_value="OK")
+    return val
+
+class MockAsyncioQueue(object):
+  def __init__(self):
+    real_queue = asyncio.Queue()
+    self.put = CoroutineMock(wraps=real_queue.put)
+    self.get = real_queue.get
+
 class TestWebsocketClient(asynctest.TestCase):
-  def mockThreads(self):
-    class MockThread(object):
-      def __init__(self, target=lambda: None):
-        self._target = target
-
-      def start(self):
-        self._target()
-    self.thread_patcher = patch.object(threading, "Thread", new=MockThread)
-    mod = self.thread_patcher.start()
-
-  def unmockThreads(self):
-    if not self.thread_patcher:
-      return
-    self.thread_patcher.stop()
-    self.thread_patcher = None
-
   def setUp(self):
     self.client = WebsocketClient("ws://url")
     self.client.recv = lambda msg: msg
-    self.mockThreads()
 
   def tearDown(self):
-    self.client = None
-    self.unmockThreads()
+    self.client.disconnect()
 
   @patch("websockets.client")
   def test_connect_opens_connection(self, mock_ws):
-    mock_connection = CoroutineMock()
-    mock_connection.close = CoroutineMock()
-    mock_connect = CoroutineMock(return_value=mock_connection)
-    mock_ws.connect = mock_connect
+    mock_ws.connect = mock_connect = CoroutineMock(
+        return_value=MockWebsocketsConnection()
+    )
 
-    def disconnect():
-      sleep(1)
-      self.client.disconnect()
-    self.unmockThreads()
-    threading.Thread(target=disconnect).start()
-    self.mockThreads()
+    self.client.connect()
+    self.client.disconnect()
 
-    with patch("asyncio.gather", new=CoroutineMock()) as mock_gather:
-      mock_gather.return_value = "OK"
-      self.client.connect()
     mock_connect.assert_awaited()
 
   def test_disconnect_before_connect_succeeds(self):
@@ -64,28 +58,41 @@ class TestWebsocketClient(asynctest.TestCase):
 
   @patch("websockets.client")
   def test_disconnect_after_connect_succeeds(self, mock_ws):
-    mock_connection = CoroutineMock()
-    mock_connection.close = CoroutineMock()
-    mock_connect = CoroutineMock(return_value=mock_connection)
-    mock_ws.connect = mock_connect
+    mock_ws.connect = CoroutineMock(return_value=MockWebsocketsConnection())
 
-    # Run in threaded mode, reflecting real usage.
-    self.unmockThreads()
+    self.client.connect()
+    self.client.disconnect()
 
-    with patch("asyncio.gather", new=CoroutineMock()) as mock_gather:
-      mock_gather.return_value = "OK"
-      self.client.connect()
+  @patch("asyncio.Queue", return_value=MockAsyncioQueue())
+  @patch("websockets.client")
+  def test_send_one_succeeds(self, mock_ws, mock_queue):
+    mock_ws.connect = CoroutineMock(return_value=MockWebsocketsConnection())
+    mock_put = mock_queue.return_value.put
+
+    self.client.connect()
+
+    self.client.send("message")
+    mock_put.assert_awaited()
 
     self.client.disconnect()
 
-  def test_send_one_succeeds(self):
-    pass
+  @patch("asyncio.Queue", return_value=MockAsyncioQueue())
+  @patch("websockets.client")
+  def test_send_many_succeeds(self, mock_ws, mock_queue):
+    mock_ws.connect = CoroutineMock(return_value=MockWebsocketsConnection())
+    mock_put = mock_queue.return_value.put
 
-  def test_send_many_succeeds(self):
-    pass
+    self.client.connect()
 
-  def test_send_fails(self):
-    pass
+    self.client.send("message")
+    mock_put.assert_awaited()
+    mock_put.reset_mock()
+
+    self.client.send("next")
+    mock_put.assert_awaited()
+    mock_put.reset_mock()
+
+    self.client.disconnect()
 
   def test_send_after_disconnect_fails(self):
     self.client.disconnect()
