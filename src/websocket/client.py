@@ -2,6 +2,7 @@ import asyncio
 from concurrent.futures import CancelledError
 import threading
 import websockets
+from websockets.exceptions import ConnectionClosed
 
 
 class WebsocketClientException(Exception):
@@ -115,19 +116,18 @@ class WebsocketClient(object):
 
   async def _handle_send(self):
     while True:
-      msg = None
+      msg = await self._outbox.get()
       try:
-        msg = await self._outbox.get()
-      except AttributeError:
+        await self._ws.send(msg)
+      except ConnectionClosed:
         return
-      await self._ws.send(msg)
 
   async def _handle_recv(self):
     while True:
       msg = None
       try:
         msg = await self._ws.recv()
-      except AttributeError:
+      except ConnectionClosed:
         return
       self.recv(msg)
 
