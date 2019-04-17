@@ -22,50 +22,42 @@ class WebsocketClient(object):
   """
   def __init__(self, url):
     self._url = url
-    self._ws = None
+
+    # Tracks the main loop execution.
+    self._task = None
+
+    # The underlying connection.
+    self._socket = None
 
     # Manages intended connection state.
     self._running = False
 
-    # Used to lock construction/destruction of WebSocket connection.
-    self._lk = threading.Lock()
-    self._cv = threading.Condition(self._lk)
-
-    # For outgoing messages. Set up with a Queue when the main loop begins.
-    self._outbox = None
-
-  def connect(self):
+  async def connect(self):
     """
     Opens a connection to the WebSocket server, enabling the client to send
     and receive messages.
     """
-    def _start():
-      asyncio.run(self._main_loop())
+    ready = asyncio.Event()
 
-    threading.Thread(target=_start).start()
+    self._task = asyncio.create_task(self._main_loop(ready))
 
-    # Wait until the loop has declared itself running before we return.
-    with self._cv:
-      while not self._running:
-        self._cv.wait()
+    await ready.wait()
 
-  def disconnect(self):
+  async def disconnect(self):
     """
     Closes the connection to the WebSocket server.
     """
-    async def func():
-      with self._cv:
-        # Terminate the main loop, if it is running.
-        self._running = False
+    # Terminate the main loop, if it is running.
+    self._running = False
 
-      with self._cv:
-        # Close the underlying connection.
-        if self._ws is not None:
-          await self._ws.close()
+    # Close the underlying connection.
+    if self._socket is not None:
+      await self._socket.wait_closed()
 
-    asyncio.run(func())
+      await self._task
+      self._task = None
 
-  def send(self, msg):
+  async def send(self, msg):
     """
     Send a message to the server. The message is enqueued with other messages
     for this client, so it is not guaranteed to be sent immediately; it may
@@ -77,12 +69,11 @@ class WebsocketClient(object):
     Raises:
       WebsocketClientException  : If the client is not connected.
     """
-    with self._cv:
-      if not self._running:
-        raise WebsocketClientException("Client is not connected!")
-      asyncio.run(self._outbox.put(msg))
+    if self._socket is None:
+      raise WebsocketClientException("Client is not connected!")
+    await self._socket.send(msg)
 
-  def recv(self, msg):
+  async def recv(self, msg):
     """
     Handle a newly received message from the server, which is passed in as
     the given string.
@@ -94,97 +85,31 @@ class WebsocketClient(object):
     """
     pass
 
-  def _create_send_queue(self):
-    self._outbox = asyncio.Queue()
-
-  def _destroy_send_queue(self):
-    self._outbox = None
-
-  async def _create_connection(self):
-    # Modification must occur under the lock.
-    assert self._ws is None
-    self._ws = await websockets.client.connect(self._url)
-
-  async def _destroy_connection(self):
-    # Modification must occur under the lock.
-    assert self._ws is not None
-    self._ws = None
-
-  async def _handle_send(self):
-    while True:
-      msg = await self._outbox.get()
-      try:
-        await self._ws.send(msg)
-      except ConnectionClosed:
-        return
-
-  async def _handle_recv(self):
-    while True:
-      msg = None
-      try:
-        msg = await self._ws.recv()
-      except ConnectionClosed:
-        return
-      self.recv(msg)
-
-  async def _send_recv_until_closed(self):
-    # Wrap the handlers, to ensure they can be 'wait'ed on.
-    send = asyncio.ensure_future(self._handle_send())
-    recv = asyncio.ensure_future(self._handle_recv())
-
-    _, pending = await asyncio.wait(
-        [send, recv],
-        return_when=asyncio.FIRST_COMPLETED
-    )
-
-    return pending
-
-  async def _reap_tasks(self, pending):
-    for task in pending:
-      task.cancel()
-      await task
-
-  async def _main_loop(self):
+  async def _main_loop(self, ready):
     """
     The main loop which houses the client logic for handling send/recv events.
     Run as a coroutine which establishes, destroys, and re-establishes the
     underlying websocket connection based on the current state of the caller's
     intent.
+
+    ready (asyncio.Event) : Used to signal when the main loop has been
+                            bootstrapped and is ready to process messages.
     """
-    with self._cv:
-      # Construct the queue for storing messages to be sent.
-      # This must be done in the same async event loop as it is
-      # used in.
-      self._create_send_queue()
+    if self._running:
+      return
+    self._running = True
 
-      if self._running:
-        return
-      self._running = True
-      self._cv.notify()
+    ready.set()
 
-    running = True
-
-    while running:
+    while self._running:
       # Set up the connection.
-      with self._cv:
-        await self._create_connection()
+      self._socket = await websockets.client.connect(self._url)
 
-      # Handle send/recv events.
-      pending = await self._send_recv_until_closed()
-
-      # Reap any lingering tasks.
       try:
-        await self._reap_tasks(pending)
-      except CancelledError:
-        pass
-
-      # Tear down the connection on the client.
-      with self._cv:
-        await self._destroy_connection()
-
-      with self._cv:
-        running = self._running
-
-    with self._cv:
-      # Tear down the queue after the loop has terminated.
-      self._destroy_send_queue()
+        while True:
+          msg = await self._socket.recv()
+          await self.recv(msg)
+      except ConnectionClosed:
+        return
+  
+    self._socket = None
