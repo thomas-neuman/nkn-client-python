@@ -1,6 +1,10 @@
-from nkn_client.websocket.client import WebsocketClient
+import asyncio
+import json
 
-class WebsocketJsonRpcClient(WebsocketClient):
+from nkn_client.websocket.client import WebsocketClient
+from nkn_client.websocket.api_request import WebsocketApiRequest
+
+class WebsocketApiClient(WebsocketClient):
   """
   Extends the original WebsocketClient by implementing a flow for
   API call-and-response. This flow is synchronous in nature, and
@@ -9,10 +13,15 @@ class WebsocketJsonRpcClient(WebsocketClient):
   such a context.
   """
   def __init__(self, url):
-    self._lk = threading.Lock()
+    WebsocketClient.__init__(self, url)
 
+    # Set of response handlers. Each key is a method name, and
+    # the value is a list of functions which handle responses for
+    # responses on that method.
     self._handlers = {}
-    pass
+
+    # Locks access to the handlers dict.
+    self._handlers_lk = asyncio.Lock()
 
   def interrupt(self, msg):
     """
@@ -24,7 +33,7 @@ class WebsocketJsonRpcClient(WebsocketClient):
     """
     raise NotImplementedError
 
-  def call_rpc(self, method, params=None):
+  async def call_rpc(self, method, params=None, timeout=None):
     """
     Invoke an RPC on the peer.
 
@@ -33,24 +42,33 @@ class WebsocketJsonRpcClient(WebsocketClient):
       params (iterable) : Any arguments required for the invocation.
                           A list may be provided for positional
                           arguments, or a dict for keywords.
+      timeout (int)     : Maximum time to await a response, in
+                          seconds.
     Returns:
       dict              : The API response.
     """
-    pass
+    req = WebsocketApiRequest(self, method, params)
 
-  def _parse_json_rpc(self, msg):
-    """
-    Parse a received message as a JSON RPC.
+    # Register the response handler at the same time as we issue
+    # the request.
+    with self._handlers_lk:
+      handlers = []
+      try:
+        handlers = self._handlers[method]
+      except KeyError:
+        self._handlers[method] = handlers
+      handlers.append(req.handle)
 
-    Args:
-      msg (str)                 : The message.
-    Returns:
-      dict                      : The parsed JSON RPC.
-    Raises:
-      WebsocketJsonRpcException : If the message could not be
-                                  parsed as an RPC.
-    """
-    pass
+      await req.request()
+
+    try:
+      resp = await req.response(timeout)
+    except WebsocketApiTimeoutException:
+      with self._handlers_lk:
+        handlers = self._handlers[method]
+        handlers.pop()
+    
+    return resp
 
   async def recv(self, msg):
     """
@@ -65,15 +83,25 @@ class WebsocketJsonRpcClient(WebsocketClient):
                                   handled.
     """
     try:
-      msg = self._parse_json_rpc(msg)
-    except WebsocketJsonRpcException:
+      msg = json.loads(msg)
+    except ValueError:
+      # If we cannot parse the response, defer to the interrupt handler.
       self.interrupt(msg)
-    with self._lk:
-      method = msg["method"]
-      params = msg.get("params")
+      return
+
+    method = msg["method"]
+    with self._handlers_lk:
       try:
-        handler, enabled = self._handlers[method]
-        assert enabled
-        handler(method, params)
+        # Find the handler for this message, and call it.
+        handlers = self._handlers[method]
+        handler = handlers.pop()
+
+        handler(msg)
       except KeyError:
-        raise WebsocketJsonRpcException()
+        # A method for which a request was never sent, defer to the
+        # interrupt handler.
+        self.interrupt(msg)
+      except IndexError:
+        # A request was sent at one point for this method, but all
+        # of the handlers have either been consumed or timed out.
+        return
