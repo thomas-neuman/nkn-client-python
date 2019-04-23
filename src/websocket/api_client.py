@@ -31,7 +31,7 @@ class WebsocketApiClient(WebsocketClient):
     Args:
       msg (str) : The message received.
     """
-    raise NotImplementedError
+    pass
 
   async def call_rpc(self, method, params=None, timeout=None):
     """
@@ -89,7 +89,7 @@ class WebsocketApiClient(WebsocketClient):
       self.interrupt(msg)
       return
 
-    method = msg["method"]
+    method = msg["Action"]
     with self._handlers_lk:
       try:
         # Find the handler for this message, and call it.
