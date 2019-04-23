@@ -2,7 +2,6 @@ import asyncio
 import json
 
 from nkn_client.websocket.client import WebsocketClient
-from nkn_client.websocket.api_request import WebsocketApiRequest
 
 class WebsocketApiClient(WebsocketClient):
   """
@@ -33,41 +32,54 @@ class WebsocketApiClient(WebsocketClient):
     """
     pass
 
-  async def call_rpc(self, method, params=None, timeout=None):
+  async def call_rpc(self, method, timeout=None, **kwargs):
     """
     Invoke an RPC on the peer.
 
     Args:
       method (str)      : The name of the remote API to call.
-      params (iterable) : Any arguments required for the invocation.
-                          A list may be provided for positional
-                          arguments, or a dict for keywords.
       timeout (int)     : Maximum time to await a response, in
                           seconds.
+      kwargs            : Additional parameters to supply with the API call.
     Returns:
       dict              : The API response.
     """
-    req = WebsocketApiRequest(self, method, params)
+    resp = None
+    done = asyncio.Event()
+    def handle(msg):
+      resp = msg
+      done.set()
+
+    msg = {
+      "Action": method
+    }
+    if kwargs is not None:
+      msg.update(kwargs)
+    msg = json.dumps(msg)
 
     # Register the response handler at the same time as we issue
     # the request.
-    with self._handlers_lk:
+    async with self._handlers_lk:
       handlers = []
       try:
         handlers = self._handlers[method]
       except KeyError:
         self._handlers[method] = handlers
-      handlers.append(req.handle)
+      handlers.append(handle)
 
-      await req.request()
+      await self.send(msg)
 
     try:
-      resp = await req.response(timeout)
-    except WebsocketApiTimeoutException:
-      with self._handlers_lk:
+      await asyncio.wait_for(done.wait(), timeout=timeout)
+    except asyncio.TimeoutError:
+      pass
+    finally:
+      async with self._handlers_lk:
         handlers = self._handlers[method]
         handlers.pop()
-    
+        print("Popped! - %s" % (handlers))
+        print("%s" % (self._handlers))
+
     return resp
 
   async def recv(self, msg):
@@ -90,11 +102,11 @@ class WebsocketApiClient(WebsocketClient):
       return
 
     method = msg["Action"]
-    with self._handlers_lk:
+    async with self._handlers_lk:
       try:
         # Find the handler for this message, and call it.
         handlers = self._handlers[method]
-        handler = handlers.pop()
+        handler = handlers[0]
 
         handler(msg)
       except KeyError:
