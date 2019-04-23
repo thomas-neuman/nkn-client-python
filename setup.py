@@ -7,13 +7,13 @@ setup(
     version='0.1',
     description='Client for the NKN Network',
     author='Thomas Neuman',
-		url='https://github.com/thomas-neuman/nkn-client-python/',
+    url='https://github.com/thomas-neuman/nkn-client-python/',
     packages=[
       'nkn_client',
       'nkn_client.jsonrpc',
       'nkn_client.websocket'
     ],
-		package_dir={
+    package_dir={
       'nkn_client': 'src',
     },
     install_requires=[
