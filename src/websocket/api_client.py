@@ -98,7 +98,7 @@ class WebsocketApiClient(WebsocketClient):
     except ValueError:
       # If we cannot parse the response, defer to the interrupt handler.
       # TODO: Log parse failure.
-      self.interrupt(msg)
+      await self.interrupt(msg)
       return
 
     method = msg["Action"]
