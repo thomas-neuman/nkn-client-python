@@ -22,7 +22,7 @@ class WebsocketApiClient(WebsocketClient):
     # Locks access to the handlers dict.
     self._handlers_lk = asyncio.Lock()
 
-  def interrupt(self, msg):
+  async def interrupt(self, msg):
     """
     Handle an unprompted message from the peer. To be implemented
     by subclasses.
@@ -72,6 +72,7 @@ class WebsocketApiClient(WebsocketClient):
     try:
       await asyncio.wait_for(done.wait(), timeout=timeout)
     except asyncio.TimeoutError:
+      # TODO: Log timeout with error or warning.
       pass
     finally:
       async with self._handlers_lk:
@@ -96,6 +97,7 @@ class WebsocketApiClient(WebsocketClient):
       msg = json.loads(msg)
     except ValueError:
       # If we cannot parse the response, defer to the interrupt handler.
+      # TODO: Log parse failure.
       self.interrupt(msg)
       return
 
@@ -110,8 +112,10 @@ class WebsocketApiClient(WebsocketClient):
       except KeyError:
         # A method for which a request was never sent, defer to the
         # interrupt handler.
-        self.interrupt(msg)
+        # TODO: Log unknown message.
+        await self.interrupt(msg)
       except IndexError:
         # A request was sent at one point for this method, but all
         # of the handlers have either been consumed or timed out.
+        # TODO: Log stray message.
         return
