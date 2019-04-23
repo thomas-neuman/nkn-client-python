@@ -77,8 +77,6 @@ class WebsocketApiClient(WebsocketClient):
       async with self._handlers_lk:
         handlers = self._handlers[method]
         handlers.pop()
-        print("Popped! - %s" % (handlers))
-        print("%s" % (self._handlers))
 
     return resp
 
