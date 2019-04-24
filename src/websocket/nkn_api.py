@@ -7,7 +7,7 @@ from nkn_client.websocket.api_client import WebsocketApiClient
 class NknWebsocketApiClientError(Exception):
   def __init__(self, Error=None, Desc=None):
     msg = "Got error from NKN API!\nCode: %s\nDesc: %s" % (Error, Desc)
-    Exception.__init__(msg)
+    Exception.__init__(self, msg)
 
 class NknWebsocketApiClient(WebsocketApiClient):
   def __init__(self, url):
@@ -118,45 +118,45 @@ class NknWebsocketApiClient(WebsocketApiClient):
     res = await self._call_rpc("heartbeat")
     return res
 
-  async def get_session_count(self, host):
+  async def get_session_count(self, Addr):
     """
     Get session amount of websocket.
 
     Args:
-      host (str)  : Websocket to query.
+      Addr (str)  : Websocket to query.
     Returns:
       int         : The session count.
     """
-    res = await self._call_rpc("getsessioncount", Addr=host)
+    res = await self._call_rpc("getsessioncount", Addr=Addr)
     return res
 
-  async def set_client(self, addr):
+  async def set_client(self, Addr):
     """
     Register a client. Note that a client should call getwsaddr to get
     the node it should register with. If a client tries to register with
     other nodes, an error will be returned.
 
     Args:
-      addr (str)  : NKN address to register to the connected node.
+      Addr (str)  : NKN address to register to the connected node.
     """
-    res = await self._call_rpc("setclient", Addr=addr)
+    res = await self._call_rpc("setclient", Addr=Addr)
     return res
 
-  async def send_packet(self, dest, payload, signature):
+  async def send_packet(self, Dest, Payload, Signature):
     """
     Send a packet to destination NKN client. Destination NKN address
     should be a client NKN address in the form of "identifier.pubkey".
 
     Args:
-      dest (str)      : NKN address to send to.
-      payload (str)   : The message to send.
-      signature (str) : Signature of packet, signed by client.
+      Dest (str)      : NKN address to send to.
+      Payload (str)   : The message to send.
+      Signature (str) : Signature of packet, signed by client.
     """
     res = await self._call_rpc(
         "sendPacket",
-        Dest=dest,
-        Payload=payload,
-        Signature=signature
+        Dest=Dest,
+        Payload=Payload,
+        Signature=Signature
     )
     return res
 
