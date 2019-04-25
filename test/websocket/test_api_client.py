@@ -15,12 +15,12 @@ class TestWebsocketApiClient(asynctest.TestCase):
   async def test_json_parse_fails_interrupt(self):
     msg = "definitely_not_json"
 
-    mock_interrupt = MagicMock()
+    mock_interrupt = CoroutineMock()
     self._client.interrupt = mock_interrupt
 
     await self._client.recv(msg)
 
-    mock_interrupt.assert_called_once_with(msg)
+    mock_interrupt.assert_awaited_once_with(msg)
 
   async def test_unhandled_method_interrupt(self):
     expected = {
@@ -28,12 +28,12 @@ class TestWebsocketApiClient(asynctest.TestCase):
     }
     msg = json.dumps(expected)
 
-    mock_interrupt = MagicMock()
+    mock_interrupt = CoroutineMock()
     self._client.interrupt = mock_interrupt
 
     await self._client.recv(msg)
 
-    mock_interrupt.assert_called_once_with(expected)
+    mock_interrupt.assert_awaited_once_with(expected)
 
   async def test_call_rpc_successful_response(self):
     method = "method"
