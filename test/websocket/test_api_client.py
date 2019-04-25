@@ -7,7 +7,7 @@ from nkn_client.websocket.api_client import WebsocketApiClient
 
 class TestWebsocketApiClient(asynctest.TestCase):
   def setUp(self):
-    self._client = WebsocketApiClient("url")
+    self._client = WebsocketApiClient()
 
   def tearDown(self):
     pass

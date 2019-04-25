@@ -11,8 +11,8 @@ class WebsocketApiClient(WebsocketClient):
   interface is provided for handling messages received outside of
   such a context.
   """
-  def __init__(self, url):
-    WebsocketClient.__init__(self, url)
+  def __init__(self):
+    WebsocketClient.__init__(self)
 
     # Set of response handlers. Each key is a method name, and
     # the value is a list of functions which handle responses for

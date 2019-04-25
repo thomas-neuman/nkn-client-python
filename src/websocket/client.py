@@ -20,9 +20,7 @@ class WebsocketClient(object):
   Args:
     url (str) : The remote server to communicate with.
   """
-  def __init__(self, url):
-    self._url = url
-
+  def __init__(self):
     # Tracks the main loop execution.
     self._task = None
 
@@ -32,14 +30,15 @@ class WebsocketClient(object):
     # Manages intended connection state.
     self._running = False
 
-  async def connect(self):
+  async def connect(self, hostname):
     """
     Opens a connection to the WebSocket server, enabling the client to send
     and receive messages.
     """
     ready = asyncio.Event()
 
-    self._task = asyncio.create_task(self._main_loop(ready))
+    url = "ws://%s" % hostname
+    self._task = asyncio.create_task(self._main_loop(url, ready))
 
     await ready.wait()
 
@@ -85,15 +84,17 @@ class WebsocketClient(object):
     """
     pass
 
-  async def _main_loop(self, ready):
+  async def _main_loop(self, url, ready):
     """
     The main loop which houses the client logic for handling send/recv events.
     Run as a coroutine which establishes, destroys, and re-establishes the
     underlying websocket connection based on the current state of the caller's
     intent.
 
-    ready (asyncio.Event) : Used to signal when the main loop has been
-                            bootstrapped and is ready to process messages.
+    Args:
+      url (str)             : URL to connect to.
+      ready (asyncio.Event) : Used to signal when the main loop has been
+                              bootstrapped and is ready to process messages.
     """
     if self._running:
       return
@@ -103,7 +104,7 @@ class WebsocketClient(object):
 
     while self._running:
       # Set up the connection.
-      self._socket = await websockets.client.connect(self._url)
+      self._socket = await websockets.client.connect(url)
 
       try:
         while True:

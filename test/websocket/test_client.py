@@ -33,7 +33,7 @@ class MockWebsocketsConnection(object):
 
 class TestWebsocketClient(asynctest.TestCase):
   def setUp(self):
-    self.client = WebsocketClient("ws://url")
+    self.client = WebsocketClient()
     self.client.recv = CoroutineMock(side_effect=ConnectionClosed(1, "reason"))
 
   def tearDown(self):
@@ -45,7 +45,7 @@ class TestWebsocketClient(asynctest.TestCase):
         return_value=MockWebsocketsConnection()
     )
 
-    await self.client.connect()
+    await self.client.connect("ws://url")
     await self.client.disconnect()
 
     mock_connect.assert_awaited()
@@ -59,7 +59,7 @@ class TestWebsocketClient(asynctest.TestCase):
     connection = MockWebsocketsConnection()
     mock_ws.connect = CoroutineMock(return_value=connection)
 
-    await self.client.connect()
+    await self.client.connect("ws://url")
     await self.client.disconnect()
 
     connection.wait_closed.assert_awaited()
@@ -70,7 +70,7 @@ class TestWebsocketClient(asynctest.TestCase):
     mock_ws.connect = CoroutineMock(return_value=connection)
     mock_send = connection.send
 
-    await self.client.connect()
+    await self.client.connect("ws://url")
 
     await self.client.send("message")
     mock_send.assert_awaited()
@@ -83,7 +83,7 @@ class TestWebsocketClient(asynctest.TestCase):
     mock_ws.connect = CoroutineMock(return_value=connection)
     mock_send = connection.send
 
-    await self.client.connect()
+    await self.client.connect("ws://url")
 
     await self.client.send("message")
     mock_send.assert_awaited()

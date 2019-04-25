@@ -11,12 +11,14 @@ setup(
     packages=[
       'nkn_client',
       'nkn_client.jsonrpc',
-      'nkn_client.websocket'
+      'nkn_client.websocket',
+      'nkn_client.client'
     ],
     package_dir={
       'nkn_client': 'src',
     },
     install_requires=[
+      'pynacl',
       'requests',
       'websockets'
     ],
