@@ -1,45 +1,22 @@
-class NknPacket(object):
-  def __init__(self):
-    self._src = None
-    self._dest = None
-    self._payload = None
-    self._digest = None
-    self._signature = None
+from collections import namedtuple
 
-  @property
-  def source(self):
-    return self._src
+NknPacket = namedtuple(
+    "NknPacket",
+    ["source", "destination", "payload", "digest", "signature"],
+    defaults=[None, None, None, None, None]
+)
 
-  @property
-  def destination(self):
-    return self._dest
+def NknSentPacket(dest, payload):
+  return NknPacket(destination=dest, payload=payload)
 
-  @property
-  def payload(self):
-    return self._payload
+def NknReceivedPacket(source, payload, digest):
+  return NknPacket(source=source, payload=payload, digest=digest)
 
-  @property
-  def signature(self):
-    return self._signature
-
-  @property
-  def digest(self):
-    return self._digest
-
-
-class NknReceivedPacket(NknPacket):
-  def __init__(self, src, payload, digest):
-    NknPacket.__init__(self)
-    self._src = src
-    self._payload = payload
-    self._digest = digest
-
-
-class NknSentPacket(NknPacket):
-  def __init__(self, dest, payload, signature):
-    NknPacket.__init__(self)
-    self._dest = dest
-    self._payload = payload
-
-  def sign(self, signature):
-    self._signature = signature
+def sign(packet, signature):
+  return NknPacket(
+      source=packet.source,
+      destination=packet.destination,
+      payload=packet.payload,
+      digest=packet.digest,
+      signature=signature
+  )

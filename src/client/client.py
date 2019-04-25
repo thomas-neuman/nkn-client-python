@@ -37,7 +37,7 @@ class NknClient(object):
     pubkey = self._key.verify_key
 
     # NKN client address.
-    self._addr = ".".join([ identifier, pubkey.encode(Encoder) ])
+    self._addr = ".".join([ identifier, str(pubkey.encode(Encoder)) ])
 
     # JSON-RPC API client.
     self._jsonrpc = NknJsonRpcApi(rpc_server_addr)
@@ -60,8 +60,8 @@ class NknClient(object):
     await self._ws.disconnect()
 
   def _sign_packet(self, packet):
-    signature = self._key.sign(packet.payload)
-    packet.sign(signature)
+    signed = self._key.sign(packet.payload.encode("utf-8"))
+    sign(packet, str(signed.signature))
 
   async def send(self, destination, payload):
     pkt = NknSentPacket(destination, payload)
