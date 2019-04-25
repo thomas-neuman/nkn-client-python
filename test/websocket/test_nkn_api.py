@@ -10,7 +10,7 @@ from nkn_client.websocket.nkn_api import (
 
 class TestNknWebsocketApiClient(asynctest.TestCase):
   def setUp(self):
-    self._client = NknWebsocketApiClient("url")
+    self._client = NknWebsocketApiClient()
 
   def tearDown(self):
     pass
@@ -33,7 +33,7 @@ class TestNknWebsocketApiClient(asynctest.TestCase):
         "nkn_client.websocket.nkn_api.NknWebsocketApiClient.receive_packet",
         new=mock_receive_packet
     ):
-      client = NknWebsocketApiClient("url")
+      client = NknWebsocketApiClient()
       await client.interrupt(msg)
 
       mock_receive_packet.assert_awaited_once()
@@ -64,7 +64,7 @@ class TestNknWebsocketApiClient(asynctest.TestCase):
         "nkn_client.websocket.nkn_api.NknWebsocketApiClient.update_sig_chain_block_hash",
         new=mock_update_sig_chain_block_hash
     ):
-      client = NknWebsocketApiClient("url")
+      client = NknWebsocketApiClient()
       await client.interrupt(msg)
 
       mock_update_sig_chain_block_hash.assert_awaited_once_with(

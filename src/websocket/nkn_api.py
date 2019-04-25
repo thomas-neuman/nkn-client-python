@@ -10,8 +10,8 @@ class NknWebsocketApiClientError(Exception):
     Exception.__init__(self, msg)
 
 class NknWebsocketApiClient(WebsocketApiClient):
-  def __init__(self, hostname):
-    WebsocketApiClient.__init__(self, hostname)
+  def __init__(self):
+    WebsocketApiClient.__init__(self)
 
     # Retains incoming messages, to be handled by other classes.
     self._inbox = asyncio.Queue()
