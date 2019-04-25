@@ -43,7 +43,7 @@ class NknClient(object):
     self._jsonrpc = NknJsonRpcApi(rpc_server_addr)
 
     # Websocket API client.
-    self._ws = None
+    self._ws = NknWebsocketApiClient()
 
   @property
   def sig_chain_block_hash(self):
@@ -52,36 +52,24 @@ class NknClient(object):
     return self._ws.sig_chain_block_hash
 
   async def connect(self):
-    if self._ws is None:
-      host = self._jsonrpc.get_websocket_address(self._addr)
-      self._ws = NknWebsocketApiClient(hostname)
+    host = self._jsonrpc.get_websocket_address(self._addr)
 
-    await self._ws.connect()
+    await self._ws.connect(host)
 
   async def disconnect(self):
-    if self._ws is None:
-      return
-
     await self._ws.disconnect()
-    self._ws = None
 
   def _sign_packet(self, packet):
     signature = self._key.sign(packet.payload)
     packet.sign(signature)
 
   async def send(self, destination, payload):
-    if self._ws is None:
-      return
-
     pkt = NknSentPacket(destination, payload)
     self._sign_packet(pkt)
 
     await self._ws.send_packet(pkt.destination, pkt.payload, pkt.signature)
 
   async def recv(self):
-    if self._ws is None:
-      return
-
     src, payload, digest = await self._ws.get_incoming_packet()
     pkt = NknReceivedPacket(src, payload, digest)
 
