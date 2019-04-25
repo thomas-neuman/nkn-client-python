@@ -20,8 +20,8 @@ class WebsocketClient(object):
   Args:
     url (str) : The remote server to communicate with.
   """
-  def __init__(self, url):
-    self._url = url
+  def __init__(self, hostname):
+    self._url = "ws://%s" % hostname
 
     # Tracks the main loop execution.
     self._task = None
