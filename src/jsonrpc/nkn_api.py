@@ -1,44 +1,37 @@
-import json
+from nkn_client.jsonrpc.api_client import JsonRpcApiClient
 
-from nkn_client.jsonrpc.rpc import call_rpc
-
-class NknJsonRpcApi(object):
+class NknJsonRpcApiClient(JsonRpcApiClient):
   """
-  A client for the NKN JSON-RPC API. Communicates over plaintext HTTP to submit
-  RPC requests according to the JSON-RPC 2.0 specification.
+  A client for the NKN JSON-RPC API.
 
   Args:
     hostname (str) : The hostname on which the API is served.
   """
   def __init__(self, hostname):
+    JsonRpcApiClient.__init__(self)
+
     self._url = "http://%s/" % hostname
 
-  def _call_rpc(self, *args, **kwargs):
-    result = call_rpc(self._url, *args, **kwargs)
-
-    if "error" in result:
-      raise RuntimeError(
-          "JSON-RPC server reported error!\n%s" % (json.dumps(error))
-      )
-    return result["result"]
+  def _call(self, method, *args, **kwargs):
+    return self.call(self._url, method, *args, **kwargs)
 
   def get_latest_block_height(self):
     """
     Returns the height of the latest block in the chain.
     """
-    return self._call_rpc("getlatestblockheight")
+    return self._call("getlatestblockheight")
 
   def get_latest_block_hash(self):
     """
     Returns the hash of the latest block in the chain.
     """
-    return self._call_rpc("getlatestblockhash")
+    return self._call("getlatestblockhash")
 
   def get_block_count(self):
     """
     Return the number of blocks in the chain.
     """
-    return self._call_rpc("getblockcount")
+    return self._call("getblockcount")
 
   def get_block(self, height=None, hash=None):
     """
@@ -53,20 +46,17 @@ class NknJsonRpcApi(object):
       ValueError    : If neither height nor hash are provided as parameters, or
                       if both height and hash are provided.
     """
-    if (height is None) and (hash is None):
-      raise ValueError("Must supply one of 'height' or 'hash' parameters!")
     if (height is not None) and (hash is not None):
       raise ValueError(
           "Cannot supply both of 'height' and 'hash' parameters at once!"
       )
 
-    params = {}
-    if height is not None:
-      params["height"] = height
-    if hash is not None:
-      params["hash"] = hash
+    if height:
+      return self._call("getblock", height=height)
+    if hash:
+      return self._call("getblock", hash=hash)
 
-    return self._call_rpc("getblock", params=params)
+    raise ValueError("Must supply one of 'height' or 'hash' parameters!")
 
   def get_block_transactions_by_height(self, height):
     """
@@ -80,19 +70,19 @@ class NknJsonRpcApi(object):
                       transactions hashes as strings, or None if no such block
                       exists.
     """
-    return self._call_rpc("getblocktxsbyheight", params={"height": height})
+    return self._call("getblocktxsbyheight", height=height)
 
   def get_connection_count(self):
     """
     Returns the number of connections to this node.
     """
-    return self._call_rpc("getconnectioncount")
+    return self._call("getconnectioncount")
 
   def get_raw_mempool(self):
     """
     Returns the list of transactions in the transaction mempool.
     """
-    return self._call_rpc("getrawmempool")
+    return self._call("getrawmempool")
 
   def get_transaction(self, hash):
     """
@@ -104,42 +94,42 @@ class NknJsonRpcApi(object):
       dict        : Contents of the transaction, or None if no such transaction
                     exists.
     """
-    return self._call_rpc("gettransaction", params={"hash": hash})
+    return self._call("gettransaction", hash=hash)
 
-  def get_websocket_address(self, client_addr):
+  def get_websocket_address(self, address):
     """
     Given an NKN client address, returns the websocket address for that client
     to connect to this node.
 
     Args:
-      client_addr (str) : The client address, typically of the form
-                          'identifier.pubkey'.
+      address (str) : The client address, typically of the form
+                      'identifier.pubkey'.
     Returns:
-      str               : Hostname and port of the Websocket server, to be
-                          concatenated with 'ws://' or 'wss://' to connect.
+      str           : Hostname and port of the Websocket server, to be
+                      concatenated with 'ws://' or 'wss://' to connect.
     """
-    return self._call_rpc("getwsaddr", params={"address": client_addr})
+    return self._call("getwsaddr", address=address)
 
   def get_version(self):
     """
     Returns the version of the server.
     """
-    return self._call_rpc("getversion")
+    return self._call("getversion")
 
   def get_neighbor(self):
     """
     Returns all neighbor nodes of this server.
     """
-    return self._call_rpc("getneighbor")
+    return self._call("getneighbor")
 
   def get_node_state(self):
     """
     Returns the status information of this server.
     """
-    return self._call_rpc("getnodestate")
+    return self._call("getnodestate")
 
   def get_chord_ring_info(self):
     """
     Returns the chord information of this server.
     """
-    return self._call_rpc("getchordringinfo")
+    return self._call("getchordringinfo")

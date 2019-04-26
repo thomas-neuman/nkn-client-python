@@ -3,13 +3,14 @@ import json
 import responses
 import unittest
 
-import nkn_client.jsonrpc.api
+from nkn_client.jsonrpc.api_client import JsonRpcError
+from nkn_client.jsonrpc.nkn_api import NknJsonRpcApiClient
 
 
-class TestNknJsonRpcApi(unittest.TestCase):
+class TestNknJsonRpcApiClient(unittest.TestCase):
   def setUp(self):
     self._host = "hostname"
-    self._api = nkn_client.jsonrpc.api.NknJsonRpcApi(self._host)
+    self._api = NknJsonRpcApiClient(self._host)
 
   @responses.activate
   def _with_rpc_response(self, method, resp_cb):
@@ -70,7 +71,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
     method = self._api.get_latest_block_height
     expected = 5
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_latest_block_hash_succeeds(self):
@@ -84,7 +85,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
     method = self._api.get_latest_block_hash
     expected = "6cf00422b02f3d99f5c006fcdb36bfb7cc8b2c345b2f34274e50a3d8f3bb8193"
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_block_count_succeeds(self):
@@ -98,7 +99,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
     method = self._api.get_block_count
     expected = 270
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_block_with_height_param_fails_with_wrong_id(self):
@@ -107,7 +108,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
       "hash": "5f85d1286801c2f1129a02b0b19a3312f8113aaa073b5987346c59e27a12bdc6"
     }
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_block_with_height_param_succeeds(self):
@@ -128,7 +129,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
       "hash": "5f85d1286801c2f1129a02b0b19a3312f8113aaa073b5987346c59e27a12bdc6"
     }
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_block_with_hash_param_succeeds(self):
@@ -156,7 +157,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
 			]
 		}
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_block_transactions_by_height_succeeds(self):
@@ -179,7 +180,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
     method = self._api.get_connection_count
     expected = 8
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_connection_count_succeeds(self):
@@ -193,7 +194,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
     method = self._api.get_raw_mempool
     expected = []
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_raw_mempool_succeeds(self):
@@ -212,7 +213,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
       "hash": "327bb43c2e40ccb2f83011d35602829872ab190171b79047397d000eddda18a9"
     }
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_transaction_succeeds(self):
@@ -234,7 +235,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
     )
     expected = "127.0.0.1:30002"
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_websocket_address_succeeds(self):
@@ -251,7 +252,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
     method = self._api.get_version
     expected = "v0.1-alpha-26-gf7b7"
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_version_succeeds(self):
@@ -269,7 +270,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
 			{"IpAddr":[0,0,0,0,0,0,0,0,0,0,255,255,127,0,0,1],"Port":30009,"ID":9027538565785539587}
 		]
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_neighbor_succeeds(self):
@@ -299,7 +300,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
 			"ChordID": "04629f17a6a0ec9a573ecfccb60fa42b104212dd1ec9cdb131993cbb4e15fe5e"
 		}
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_node_state_succeeds(self):
@@ -334,7 +335,7 @@ class TestNknJsonRpcApi(unittest.TestCase):
       ]
     }
 
-    with self.assertRaises(RuntimeError):
+    with self.assertRaises(JsonRpcError):
       _ = self._with_wrong_id_response(method, expected)
 
   def test_get_chord_ring_info_succeeds(self):
