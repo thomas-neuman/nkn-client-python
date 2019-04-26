@@ -8,6 +8,10 @@ class JsonRpcError(Exception):
   pass
 
 class JsonRpcApiClient(HttpClient):
+  """
+  A client for a JSON-RPC API. Implements RPC request/response flows
+  according to the JSON-RPC 2.0 specification.
+  """
   def __init__(self):
     HttpClient.__init__(self)
 

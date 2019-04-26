@@ -2,8 +2,7 @@ from nkn_client.jsonrpc.api_client import JsonRpcApiClient
 
 class NknJsonRpcApiClient(JsonRpcApiClient):
   """
-  A client for the NKN JSON-RPC API. Communicates over plaintext HTTP to submit
-  RPC requests according to the JSON-RPC 2.0 specification.
+  A client for the NKN JSON-RPC API.
 
   Args:
     hostname (str) : The hostname on which the API is served.
