@@ -19,7 +19,6 @@ class MockWebsocketsConnection(object):
     self.recv = CoroutineMock(side_effect=self._recv)
     self.wait_closed = CoroutineMock(side_effect=self._close)
     self.close = CoroutineMock(side_effect=self._close)
-    self.__aiter__ = self.recv
 
   def _close(self):
     self._running = False
@@ -27,14 +26,12 @@ class MockWebsocketsConnection(object):
   async def _recv(self):
     if not self._running:
       raise ConnectionClosed(1, "str")
-    val = MagicMock()
-    val.result = MagicMock(return_value="OK")
-    return val
+    return "OK"
 
 class TestWebsocketClient(asynctest.TestCase):
   def setUp(self):
     self.client = WebsocketClient()
-    self.client.recv = CoroutineMock(side_effect=ConnectionClosed(1, "reason"))
+    self.client.recv = CoroutineMock(side_effect=lambda _: asyncio.sleep(1))
 
   def tearDown(self):
     self.client = None

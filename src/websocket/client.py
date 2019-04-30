@@ -14,10 +14,8 @@ class WebsocketClientException(Exception):
 class WebsocketClient(object):
   """
   Client class for interacting with a Websocket server. Handles the connect
-  and disconnect logic, re-opening the connection as necessary until the
-  caller explicitly tears it down. Able to send and receive messages
-  asynchronously; the handler for received messages must be implemented by a
-  subclass.
+  and disconnect logic. Able to send and receive messages asynchronously;
+  the handler for received messages must be implemented by a subclass.
 
   Args:
     url (str) : The remote server to communicate with.
@@ -49,15 +47,20 @@ class WebsocketClient(object):
     """
     Closes the connection to the WebSocket server.
     """
+    log.debug("Received disconnect request...")
+    if not self._running:
+      return
+
+    await self._ready.wait()
+
     # Terminate the main loop, if it is running.
     self._running = False
 
     # Close the underlying connection.
-    if self._socket is not None:
-      await self._socket.wait_closed()
+    await self._socket.wait_closed()
 
-      await self._task
-      self._task = None
+    await self._task
+    self._task = None
 
   async def send(self, msg):
     """
@@ -103,24 +106,23 @@ class WebsocketClient(object):
       return
     self._running = True
 
-    while self._running:
-      # Set up the connection.
-      self._socket = await websockets.client.connect(url, ping_interval=None)
+    # Set up the connection.
+    self._socket = await websockets.client.connect(url)
 
-      log.debug("Socket setup: %s" % (self._socket))
+    log.debug("Socket setup: %s" % (self._socket))
 
-      self._ready.set()
+    self._ready.set()
 
-      try:
-        while True:
-          msg = await self._socket.recv()
-          log.debug("Received message: %s" % (msg))
-          await self.recv(msg)
-      except ConnectionClosed:
-        log.debug("Websocket connection closed.")
-        pass
+    try:
+      while True:
+        msg = await self._socket.recv()
+        log.debug("Received message: %s" % (msg))
+        await self.recv(msg)
+    except ConnectionClosed:
+      log.debug("Websocket connection closed.")
+      pass
 
-      log.debug("Reopen connection? %s" % (str(self._running)))
-      self._ready.clear()
+    log.debug("Reopen connection? %s" % (str(self._running)))
+    self._ready.clear()
 
     self._socket = None
