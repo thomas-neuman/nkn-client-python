@@ -3,7 +3,7 @@ import asynctest
 from asynctest import ANY, CoroutineMock, MagicMock, Mock, patch
 
 from nkn_client.client.client import NknClient
-from nkn_client.client.packet import *
+from nkn_client.proto.packet_pb2 import *
 
 class TestNknClient(asynctest.TestCase):
   def setUp(self):
@@ -48,20 +48,26 @@ class TestNknClient(asynctest.TestCase):
 
     dest = "dest"
     payload = "payload"
+    real_payload = payload.encode("utf-8")
+
+    pkt = OutboundPacket()
+    pkt.dest = dest
+    pkt.payload = real_payload
 
     await self._client.send(dest, payload)
 
-    mock_send.assert_awaited_once_with(dest, payload, ANY)
+    mock_send.assert_awaited_once_with(pkt)
 
   async def test_recv(self):
     src = "src"
-    payload = "payload"
-    digest = "digest"
+    payload = "payload".encode("utf-8")
 
-    expected = NknReceivedPacket(src, payload, digest)
+    expected = InboundPacket()
+    expected.src = src
+    expected.payload = payload
 
     mock_ws = MagicMock()
-    mock_recv = CoroutineMock(return_value=(src, payload, digest))
+    mock_recv = CoroutineMock(return_value=expected)
     mock_ws.get_incoming_packet = mock_recv
     self._client._ws = mock_ws
 

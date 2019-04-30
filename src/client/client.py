@@ -2,8 +2,8 @@ import logging
 from nacl.encoding import HexEncoder as Encoder
 from nacl.signing import SigningKey as Key
 
-from nkn_client.client.packet import *
 from nkn_client.jsonrpc.api import NknJsonRpcApi
+from nkn_client.proto.packet_pb2 import *
 from nkn_client.websocket.nkn_api import NknWebsocketApiClient
 
 log = logging.getLogger(__name__)
@@ -70,22 +70,34 @@ class NknClient(object):
 
   def _sign_packet(self, packet):
     signed = self._key.sign(packet.payload.encode("utf-8"))
-    log.info("Signed packet %s with signature %s" % (packet, signed.signature))
     #return sign(packet, str(signed.signature))
     return sign(packet, "")
 
   async def send(self, destination, payload):
-    pkt = NknSentPacket(destination, payload)
-    pkt = self._sign_packet(pkt)
+    if isinstance(payload, str):
+      payload = payload.encode("utf-8")
+
+    signed = self._key.sign(payload)
+    signature = signed.signature
+    log.info(
+        "Signed packet (dest: %s, payload: %s) with signature %s" %
+        (destination, payload, signature)
+    )
+
+    # Null signature for now.
+    signature = ""
 
     log.debug(
         "Sending packet: destination %s, payload %s, signature %s" %
-        (pkt.destination, pkt.payload, pkt.signature)
+        (destination, payload, signature)
     )
-    await self._ws.send_packet(pkt.destination, pkt.payload, pkt.signature)
+    pkt = OutboundPacket()
+    pkt.dest = destination
+    pkt.payload = payload
+
+    await self._ws.send_packet(pkt)
 
   async def recv(self):
-    src, payload, digest = await self._ws.get_incoming_packet()
-    pkt = NknReceivedPacket(src, payload, digest)
+    pkt = await self._ws.get_incoming_packet()
 
     return pkt

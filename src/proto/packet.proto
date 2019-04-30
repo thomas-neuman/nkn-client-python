@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+message OutboundPacket {
+  // Packet destiantion, NKN address.
+  string dest = 1;
+
+  // Packet payload.
+  bytes payload = 2;
+
+  // Unsupported. Destination list, for PubSub.
+  repeated string dests = 3;
+
+  // Unsupported. Max time to hold message, in seconds.
+  uint32 max_holding_secs = 4;
+}
+
+message InboundPacket {
+  // Packet source, NKN address.
+  string src = 1;
+
+  // Packet payload.
+  bytes payload = 2;
+}

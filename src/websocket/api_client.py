@@ -100,7 +100,7 @@ class WebsocketApiClient(WebsocketClient):
       msg = json.loads(msg)
     except ValueError:
       # If we cannot parse the response, defer to the interrupt handler.
-      # TODO: Log parse failure.
+      log.info("Could not parse message, deferring to interrupt.")
       await self.interrupt(msg)
       return
 

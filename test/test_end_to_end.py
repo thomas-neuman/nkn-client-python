@@ -1,11 +1,12 @@
 import asyncio
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 import nkn_client
 
 async def main():
+  return
   from_client = nkn_client.NknClient("one")
   to_client = nkn_client.NknClient("two")
 
