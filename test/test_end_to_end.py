@@ -1,12 +1,11 @@
 import asyncio
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 import nkn_client
 
 async def main():
-  return
   from_client = nkn_client.NknClient("one")
   to_client = nkn_client.NknClient("two")
 
@@ -23,7 +22,6 @@ async def main():
   payload = "It's alive!"
 
   await from_client.send(destination, payload)
-  print("Sent!")
 
   packet = await to_client.recv()
   assert packet.payload == payload

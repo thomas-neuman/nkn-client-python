@@ -18,7 +18,8 @@ class NknClient(object):
     identifier (str)              : Client identifier.
     seed (str)                    : Private seed for the client key, as hex.
     rpc_server_addr (str)         : Address to bootstrap from JSON-RPC.
-    reconnect_interval_min (int)  : Unsupported.
+    reconnect_interval_min (int)  : Minimum time, in seconds, to wait between
+                                    reconnects.
     reconnect_interval_max (int)  : Unsupported.
     response_timeout_secs (int)   : Unsupported.
     msg_holding_secs (int)        : Unsupported.
@@ -50,6 +51,8 @@ class NknClient(object):
     self._running = False
     self._ready = asyncio.Event()
 
+    self._reconnect_interval_min = reconnect_interval_min
+
     # JSON-RPC API client.
     self._jsonrpc = NknJsonRpcApi(rpc_server_addr)
 
@@ -68,11 +71,15 @@ class NknClient(object):
 
   async def _retry_connection(self):
     while self._running:
-      await self._ws.unready.wait()
       log.debug("No websocket connection available, getting node address...")
-      host = self._jsonrpc.get_websocket_address(self._addr)
-      log.info("Got new Websocket node address: %s" % (host))
-      await self._ws.connect(host)
+      try:
+        host = self._jsonrpc.get_websocket_address(self._addr)
+        log.info("Got new Websocket node address: %s" % (host))
+        await self._ws.connect(host)
+      except:
+        pass
+      await self._ws.unready.wait()
+      asyncio.sleep(self._reconnect_interval_min)
 
   async def connect(self):
     if self._running:
