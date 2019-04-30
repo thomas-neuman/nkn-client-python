@@ -1,7 +1,10 @@
 import asyncio
 import json
+import logging
 
 from nkn_client.websocket.api_client import WebsocketApiClient
+
+log = logging.getLogger(__name__)
 
 
 class NknWebsocketApiClientError(Exception):
@@ -31,17 +34,23 @@ class NknWebsocketApiClient(WebsocketApiClient):
       await handler(**msg)
     except KeyError:
       # TODO: Log unhandled message with a warning.
+      log.warn("Uknown method %s!" % (method))
       pass
 
-  async def _call_rpc(self, method, **kwargs):
+  async def _call_rpc(self, method, timeout=None, **kwargs):
     """
     Wraps the usual client 'call_rpc' method with additional handling to
     raise errors and return the actual result value from the response.
 
     See WebsocketApiClient.call_rpc for args.
     """
-    res = await self.call_rpc(self, method, **kwargs)
+    log.debug(
+      "Call RPC: method %s, timeout %s, kwargs %s" %
+      (method, timeout, kwargs)
+    )
+    res = await self.call_rpc(method, timeout=timeout, **kwargs)
     self.raise_error(**res)
+    log.debug("Call RPC result: %s" % (res))
     return res["Result"]
 
   def raise_error(self, Error=None, Desc=None, **kwargs):
@@ -178,6 +187,11 @@ class NknWebsocketApiClient(WebsocketApiClient):
     """
     assert Action == "receivePacket"
 
+    log.debug(
+      "Received packet: src %s, payload %s, digest %s" %
+      (Src, Payload, Digest)
+    )
+
     await self._inbox.put( (Src, Payload, Digest) )
 
   async def get_incoming_packet(self):
@@ -209,6 +223,7 @@ class NknWebsocketApiClient(WebsocketApiClient):
       Result (str)  : The block hash.
       Version (str) : NKN version.
     """
+    log.info("Updating sig chain block hash: %s" % (Result))
     self._latest_hash = Result
 
   @property

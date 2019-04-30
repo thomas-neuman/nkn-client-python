@@ -1,13 +1,15 @@
 import asyncio
 from concurrent.futures import CancelledError
-import threading
+import logging
+import sys
 import websockets
 from websockets.exceptions import ConnectionClosed
+
+log = logging.getLogger(__name__)
 
 
 class WebsocketClientException(Exception):
   pass
-
 
 class WebsocketClient(object):
   """
@@ -27,6 +29,9 @@ class WebsocketClient(object):
     # The underlying connection.
     self._socket = None
 
+    # Tracks when the connection is actually open.
+    self._ready = asyncio.Event()
+
     # Manages intended connection state.
     self._running = False
 
@@ -35,12 +40,10 @@ class WebsocketClient(object):
     Opens a connection to the WebSocket server, enabling the client to send
     and receive messages.
     """
-    ready = asyncio.Event()
-
     url = "ws://%s" % hostname
-    self._task = asyncio.create_task(self._main_loop(url, ready))
+    self._task = asyncio.create_task(self._main_loop(url))
 
-    await ready.wait()
+    await self._ready.wait()
 
   async def disconnect(self):
     """
@@ -68,8 +71,9 @@ class WebsocketClient(object):
     Raises:
       WebsocketClientException  : If the client is not connected.
     """
-    if self._socket is None:
+    if not self._running:
       raise WebsocketClientException("Client is not connected!")
+    await self._ready.wait()
     await self._socket.send(msg)
 
   async def recv(self, msg):
@@ -84,7 +88,7 @@ class WebsocketClient(object):
     """
     pass
 
-  async def _main_loop(self, url, ready):
+  async def _main_loop(self, url):
     """
     The main loop which houses the client logic for handling send/recv events.
     Run as a coroutine which establishes, destroys, and re-establishes the
@@ -93,24 +97,30 @@ class WebsocketClient(object):
 
     Args:
       url (str)             : URL to connect to.
-      ready (asyncio.Event) : Used to signal when the main loop has been
-                              bootstrapped and is ready to process messages.
     """
+    log.debug("Connect requested to %s" % (url))
     if self._running:
       return
     self._running = True
 
-    ready.set()
-
     while self._running:
       # Set up the connection.
-      self._socket = await websockets.client.connect(url)
+      self._socket = await websockets.client.connect(url, ping_interval=None)
+
+      log.debug("Socket setup: %s" % (self._socket))
+
+      self._ready.set()
 
       try:
         while True:
           msg = await self._socket.recv()
+          log.debug("Received message: %s" % (msg))
           await self.recv(msg)
       except ConnectionClosed:
-        return
-  
+        log.debug("Websocket connection closed.")
+        pass
+
+      log.debug("Reopen connection? %s" % (str(self._running)))
+      self._ready.clear()
+
     self._socket = None

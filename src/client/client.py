@@ -1,9 +1,13 @@
+import logging
 from nacl.encoding import HexEncoder as Encoder
 from nacl.signing import SigningKey as Key
 
 from nkn_client.client.packet import *
 from nkn_client.jsonrpc.api import NknJsonRpcApi
 from nkn_client.websocket.nkn_api import NknWebsocketApiClient
+
+log = logging.getLogger(__name__)
+
 
 class NknClient(object):
   """
@@ -37,13 +41,18 @@ class NknClient(object):
     pubkey = self._key.verify_key
 
     # NKN client address.
-    self._addr = ".".join([ identifier, str(pubkey.encode(Encoder)) ])
+    addr_bytes = ".".join([ identifier, str(pubkey.encode(Encoder), "utf-8") ])
+    self._addr = str(addr_bytes)
 
     # JSON-RPC API client.
     self._jsonrpc = NknJsonRpcApi(rpc_server_addr)
 
     # Websocket API client.
     self._ws = NknWebsocketApiClient()
+
+  @property
+  def address(self):
+    return self._addr
 
   @property
   def sig_chain_block_hash(self):
@@ -61,12 +70,18 @@ class NknClient(object):
 
   def _sign_packet(self, packet):
     signed = self._key.sign(packet.payload.encode("utf-8"))
-    sign(packet, str(signed.signature))
+    log.info("Signed packet %s with signature %s" % (packet, signed.signature))
+    #return sign(packet, str(signed.signature))
+    return sign(packet, "")
 
   async def send(self, destination, payload):
     pkt = NknSentPacket(destination, payload)
-    self._sign_packet(pkt)
+    pkt = self._sign_packet(pkt)
 
+    log.debug(
+        "Sending packet: destination %s, payload %s, signature %s" %
+        (pkt.destination, pkt.payload, pkt.signature)
+    )
     await self._ws.send_packet(pkt.destination, pkt.payload, pkt.signature)
 
   async def recv(self):
