@@ -2,6 +2,7 @@ import asyncio
 import asynctest
 from asynctest import CoroutineMock, MagicMock, Mock, patch
 
+from nkn_client.proto.packet_pb2 import *
 from nkn_client.websocket.nkn_api import (
     NknWebsocketApiClient,
     NknWebsocketApiClientError
@@ -16,17 +17,13 @@ class TestNknWebsocketApiClient(asynctest.TestCase):
     pass
 
   async def test_interrupt_receive_packet(self):
-    action = "receivePacket"
     src = "src"
-    payload = "payload"
-    digest = "digest"
+    payload = "payload".encode("utf-8")
 
-    msg = {
-      "Action": action,
-      "Src": src,
-      "Payload": payload,
-      "Digest": digest
-    }
+    pkt = InboundPacket()
+    pkt.src = src
+    pkt.payload = payload
+    msg = pkt.SerializeToString()
 
     mock_receive_packet = CoroutineMock()
     with patch(
@@ -37,12 +34,7 @@ class TestNknWebsocketApiClient(asynctest.TestCase):
       await client.interrupt(msg)
 
       mock_receive_packet.assert_awaited_once()
-      mock_receive_packet.assert_awaited_once_with(
-        Action=action,
-        Src=src,
-        Payload=payload,
-        Digest=digest
-      )
+      mock_receive_packet.assert_awaited_once_with(pkt)
 
   async def test_interrupt_update_sig_chain_block_hash(self):
     action = "updateSigChainBlockHash"
@@ -313,54 +305,25 @@ class TestNknWebsocketApiClient(asynctest.TestCase):
 
   async def test_send_packet_success(self):
     expected = None
-    mock_call = CoroutineMock(return_value={
-      "Action": "sendPacket",
-      "Error": 0,
-      "Desc": "SUCCESS",
-      "Result": expected,
-      "Version": "1.0.0"
-    })
-    self._client.call_rpc = mock_call
+    mock_send = CoroutineMock()
+    self._client.send = mock_send
 
-    actual = await self._client.send_packet(
-        "nkn.address",
-        "message",
-        "signature"
-    )
+    pkt = OutboundPacket()
+    pkt.dest = "nkn.address"
+    pkt.payload = "message".encode("utf-8")
 
-    self.assertEqual(actual, expected)
+    await self._client.send_packet(pkt)
 
-  async def test_send_packet_error(self):
-    mock_call = CoroutineMock(return_value={
-      "Action": "sendPacket",
-      "Error": 41002,
-      "Desc": "SERVICE CEILING",
-      "Result": "result",
-      "Version": "1.0.0"
-    })
-    self._client.call_rpc = mock_call
-
-    with self.assertRaises(NknWebsocketApiClientError):
-      _ = await self._client.send_packet("nkn.address", "message", "sig")
+    mock_send.assert_awaited_once()
 
   async def test_get_incoming_packet(self):
-    Action = "receivePacket"
-    Src = "source"
-    Payload = "payload"
-    Digest = "digest"
+    expected = InboundPacket()
 
-    await self._client.receive_packet(
-        Action=Action,
-        Src=Src,
-        Payload=Payload,
-        Digest=Digest
-    )
+    await self._client.receive_packet(expected)
 
-    asrc, apayload, adigest = await self._client.get_incoming_packet()
+    actual = await self._client.get_incoming_packet()
 
-    self.assertEqual(asrc, Src)
-    self.assertEqual(apayload, Payload)
-    self.assertEqual(adigest, Digest)
+    self.assertEqual(actual, expected)
 
   async def test_sig_chain_block_hash(self):
     Action = "updateSigChainBlockHash"

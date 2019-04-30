@@ -10,14 +10,16 @@ setup(
     url='https://github.com/thomas-neuman/nkn-client-python/',
     packages=[
       'nkn_client',
+      'nkn_client.client',
       'nkn_client.jsonrpc',
-      'nkn_client.websocket',
-      'nkn_client.client'
+      'nkn_client.proto',
+      'nkn_client.websocket'
     ],
     package_dir={
       'nkn_client': 'src',
     },
     install_requires=[
+      'protobuf',
       'pynacl',
       'requests',
       'websockets'

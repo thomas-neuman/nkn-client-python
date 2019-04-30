@@ -1,7 +1,11 @@
 import asyncio
 import json
+import logging
 
 from nkn_client.websocket.api_client import WebsocketApiClient
+from nkn_client.proto.packet_pb2 import OutboundPacket, InboundPacket
+
+log = logging.getLogger(__name__)
 
 
 class NknWebsocketApiClientError(Exception):
@@ -20,28 +24,40 @@ class NknWebsocketApiClient(WebsocketApiClient):
     self._latest_hash = None
 
     self.INTERRUPT_HANDLERS = {
-      "receivePacket": self.receive_packet,
       "updateSigChainBlockHash": self.update_sig_chain_block_hash
     }
 
   async def interrupt(self, msg):
+    if isinstance(msg, bytes):
+      log.debug("Attempting to receivePacket with message %s" % (msg))
+      pkt = InboundPacket()
+      pkt.ParseFromString(msg)
+      
+      await self.receive_packet(pkt)
+      return
+
     method = msg["Action"]
     try:
       handler = self.INTERRUPT_HANDLERS[method]
       await handler(**msg)
     except KeyError:
-      # TODO: Log unhandled message with a warning.
+      log.warn("Uknown method %s!" % (method))
       pass
 
-  async def _call_rpc(self, method, **kwargs):
+  async def _call_rpc(self, method, timeout=None, **kwargs):
     """
     Wraps the usual client 'call_rpc' method with additional handling to
     raise errors and return the actual result value from the response.
 
     See WebsocketApiClient.call_rpc for args.
     """
-    res = await self.call_rpc(self, method, **kwargs)
+    log.debug(
+      "Call RPC: method %s, timeout %s, kwargs %s" %
+      (method, timeout, kwargs)
+    )
+    res = await self.call_rpc(method, timeout=timeout, **kwargs)
     self.raise_error(**res)
+    log.debug("Call RPC result: %s" % (res))
     return res["Result"]
 
   def raise_error(self, Error=None, Desc=None, **kwargs):
@@ -142,50 +158,38 @@ class NknWebsocketApiClient(WebsocketApiClient):
     res = await self._call_rpc("setclient", Addr=Addr)
     return res
 
-  async def send_packet(self, Dest, Payload, Signature):
+  async def send_packet(self, packet):
     """
     Send a packet to destination NKN client. Destination NKN address
     should be a client NKN address in the form of "identifier.pubkey".
 
     Args:
-      Dest (str)      : NKN address to send to.
-      Payload (str)   : The message to send.
-      Signature (str) : Signature of packet, signed by client.
+      packet (OutboundPacket) : Packet to transmit.
     """
-    res = await self._call_rpc(
-        "sendPacket",
-        Dest=Dest,
-        Payload=Payload,
-        Signature=Signature
-    )
-    return res
+    msg = packet.SerializeToString()
 
-  async def receive_packet(
-      self,
-      Action=None,
-      Src=None,
-      Payload=None,
-      Digest=None
-  ):
+    await self.send(msg)
+
+  async def receive_packet(self, packet):
     """
     Push a packet to client.
 
     Args:
-      Action (str)  : Method of the API. Must be "receivePacket".
-      Src (str)     : NKN address of the source client.
-      Payload (str) : The message received.
-      Digest (str)  : Ignored currently.
+      packet (InboundPacket)  : The incoming packet.
     """
-    assert Action == "receivePacket"
+    log.debug(
+      "Received packet: src %s, payload %s" %
+      (packet.src, packet.payload)
+    )
 
-    await self._inbox.put( (Src, Payload, Digest) )
+    await self._inbox.put(packet)
 
   async def get_incoming_packet(self):
     """
     Get the next packet received on this client.
 
     Returns:
-      (str, str, str) : Source address, payload, digest.
+      InboundPacket : Next packet received.
     """
     res = await self._inbox.get()
     return res
@@ -209,6 +213,7 @@ class NknWebsocketApiClient(WebsocketApiClient):
       Result (str)  : The block hash.
       Version (str) : NKN version.
     """
+    log.info("Updating sig chain block hash: %s" % (Result))
     self._latest_hash = Result
 
   @property

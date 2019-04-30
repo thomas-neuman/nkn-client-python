@@ -1,7 +1,10 @@
 import asyncio
 import json
+import logging
 
 from nkn_client.websocket.client import WebsocketClient
+
+log = logging.getLogger(__name__)
 
 class WebsocketApiClient(WebsocketClient):
   """
@@ -97,7 +100,7 @@ class WebsocketApiClient(WebsocketClient):
       msg = json.loads(msg)
     except ValueError:
       # If we cannot parse the response, defer to the interrupt handler.
-      # TODO: Log parse failure.
+      log.info("Could not parse message, deferring to interrupt.")
       await self.interrupt(msg)
       return
 
@@ -112,10 +115,16 @@ class WebsocketApiClient(WebsocketClient):
       except KeyError:
         # A method for which a request was never sent, defer to the
         # interrupt handler.
-        # TODO: Log unknown message.
+        log.info(
+            "Received message for unknown method %s, deferring to interrupt." %
+            (method)
+        )
         await self.interrupt(msg)
       except IndexError:
         # A request was sent at one point for this method, but all
         # of the handlers have either been consumed or timed out.
-        # TODO: Log stray message.
+        log.warn(
+            "Received message for method %s, with no more handlers!\n" %
+            (method, msg)
+        )
         return

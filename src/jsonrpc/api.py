@@ -18,7 +18,7 @@ class NknJsonRpcApi(object):
 
     if "error" in result:
       raise RuntimeError(
-          "JSON-RPC server reported error!\n%s" % (json.dumps(error))
+          "JSON-RPC server reported error!\n%s" % (json.dumps(result["error"]))
       )
     return result["result"]
 

@@ -1,9 +1,14 @@
+import asyncio
+import logging
 from nacl.encoding import HexEncoder as Encoder
 from nacl.signing import SigningKey as Key
 
-from nkn_client.client.packet import *
 from nkn_client.jsonrpc.api import NknJsonRpcApi
+from nkn_client.proto.packet_pb2 import *
 from nkn_client.websocket.nkn_api import NknWebsocketApiClient
+
+log = logging.getLogger(__name__)
+
 
 class NknClient(object):
   """
@@ -13,7 +18,8 @@ class NknClient(object):
     identifier (str)              : Client identifier.
     seed (str)                    : Private seed for the client key, as hex.
     rpc_server_addr (str)         : Address to bootstrap from JSON-RPC.
-    reconnect_interval_min (int)  : Unsupported.
+    reconnect_interval_min (int)  : Minimum time, in seconds, to wait between
+                                    reconnects.
     reconnect_interval_max (int)  : Unsupported.
     response_timeout_secs (int)   : Unsupported.
     msg_holding_secs (int)        : Unsupported.
@@ -37,7 +43,15 @@ class NknClient(object):
     pubkey = self._key.verify_key
 
     # NKN client address.
-    self._addr = ".".join([ identifier, str(pubkey.encode(Encoder)) ])
+    addr_bytes = ".".join([ identifier, str(pubkey.encode(Encoder), "utf-8") ])
+    self._addr = str(addr_bytes)
+    log.info("Instantiated client with address: %s" % (self._addr))
+
+    # Whether to continue reconnecting after disconnect.
+    self._running = False
+    self._ready = asyncio.Event()
+
+    self._reconnect_interval_min = reconnect_interval_min
 
     # JSON-RPC API client.
     self._jsonrpc = NknJsonRpcApi(rpc_server_addr)
@@ -46,31 +60,64 @@ class NknClient(object):
     self._ws = NknWebsocketApiClient()
 
   @property
+  def address(self):
+    return self._addr
+
+  @property
   def sig_chain_block_hash(self):
     if self._ws is None:
       return None
     return self._ws.sig_chain_block_hash
 
-  async def connect(self):
-    host = self._jsonrpc.get_websocket_address(self._addr)
+  async def _retry_connection(self):
+    while self._running:
+      log.debug("No websocket connection available, getting node address...")
+      try:
+        host = self._jsonrpc.get_websocket_address(self._addr)
+        log.info("Got new Websocket node address: %s" % (host))
+        await self._ws.connect(host)
+      except:
+        pass
+      await self._ws.unready.wait()
+      asyncio.sleep(self._reconnect_interval_min)
 
-    await self._ws.connect(host)
+  async def connect(self):
+    if self._running:
+      return
+    self._running = True
+
+    asyncio.create_task(self._retry_connection())
+    await self._ws.ready.wait()
 
   async def disconnect(self):
+    self._running = False
     await self._ws.disconnect()
 
-  def _sign_packet(self, packet):
-    signed = self._key.sign(packet.payload.encode("utf-8"))
-    sign(packet, str(signed.signature))
-
   async def send(self, destination, payload):
-    pkt = NknSentPacket(destination, payload)
-    self._sign_packet(pkt)
+    if isinstance(payload, str):
+      payload = payload.encode("utf-8")
 
-    await self._ws.send_packet(pkt.destination, pkt.payload, pkt.signature)
+    signed = self._key.sign(payload)
+    signature = signed.signature
+    log.info(
+        "Signed packet (dest: %s, payload: %s) with signature %s" %
+        (destination, payload, signature)
+    )
+
+    # Null signature for now.
+    signature = ""
+
+    log.debug(
+        "Sending packet: destination %s, payload %s, signature %s" %
+        (destination, payload, signature)
+    )
+    pkt = OutboundPacket()
+    pkt.dest = destination
+    pkt.payload = payload
+
+    await self._ws.send_packet(pkt)
 
   async def recv(self):
-    src, payload, digest = await self._ws.get_incoming_packet()
-    pkt = NknReceivedPacket(src, payload, digest)
+    pkt = await self._ws.get_incoming_packet()
 
     return pkt
