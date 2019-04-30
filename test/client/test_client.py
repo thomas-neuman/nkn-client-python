@@ -20,12 +20,31 @@ class TestNknClient(asynctest.TestCase):
     mock_jsonrpc.get_websocket_address = mock_getwsaddr
     self._client._jsonrpc = mock_jsonrpc
 
+    mock_ready = asyncio.Event()
+    mock_unready = asyncio.Event()
+    mock_unready.set()
+
+    def ready():
+      mock_unready.clear()
+      mock_ready.set()
+    def unready():
+      mock_ready.clear()
+      mock_unready.set()
+
+    mock_connect = CoroutineMock(side_effect=lambda _: ready())
+    mock_disconnect = CoroutineMock(side_effect=lambda: unready())
+
     mock_ws = MagicMock()
-    mock_connect = CoroutineMock()
+    mock_ws.ready = mock_ready
+    mock_ws.unready = mock_unready
     mock_ws.connect = mock_connect
+    mock_ws.disconnect = mock_disconnect
     self._client._ws = mock_ws
 
     await self._client.connect()
+
+    print("Connected!")
+    await self._client.disconnect()
 
     mock_getwsaddr.assert_called_once()
     mock_connect.assert_awaited_once_with(wsaddr)

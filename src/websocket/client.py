@@ -29,9 +29,19 @@ class WebsocketClient(object):
 
     # Tracks when the connection is actually open.
     self._ready = asyncio.Event()
+    self._unready = asyncio.Event()
+    self._unready.set()
 
     # Manages intended connection state.
     self._running = False
+
+  @property
+  def ready(self):
+    return self._ready
+
+  @property
+  def unready(self):
+    return self._unready
 
   async def connect(self, hostname):
     """
@@ -64,10 +74,8 @@ class WebsocketClient(object):
 
   async def send(self, msg):
     """
-    Send a message to the server. The message is enqueued with other messages
-    for this client, so it is not guaranteed to be sent immediately; it may
-    not be sent at all if the connection is closed via 'disconnect'. If the
-    client requests a message be sent before connecting, an error is raised.
+    Send a message to the server. If the client requests a message be sent
+    before connecting, an error is raised.
 
     Args:
       msg (str)                 : Message, as a string, to send to the server.
@@ -105,6 +113,7 @@ class WebsocketClient(object):
     if self._running:
       return
     self._running = True
+    self._unready.clear()
 
     # Set up the connection.
     self._socket = await websockets.client.connect(url)
@@ -121,8 +130,7 @@ class WebsocketClient(object):
     except ConnectionClosed:
       log.debug("Websocket connection closed.")
       pass
-
-    log.debug("Reopen connection? %s" % (str(self._running)))
-    self._ready.clear()
-
-    self._socket = None
+    finally:
+      self._ready.clear()
+      self._unready.set()
+      self._socket = None
